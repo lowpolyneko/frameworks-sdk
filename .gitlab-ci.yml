@@ -1,0 +1,126 @@
+# .gitlab-ci.yml
+# Build frameworks nightly wheels on Aurora.
+include:
+  - project: 'anl/ci-resources/defaults'
+    ref: main
+    file:
+      - '/runners.yml'
+
+stages:
+  - nightly_build
+
+variables:
+  # root under which all envs will be created
+  BUILD_ROOT: "/lus/flare/projects/datascience/.frameworks-nightly/builds"
+  # proxies
+  HTTP_PROXY:  "http://proxy.alcf.anl.gov:3128"
+  HTTPS_PROXY: "http://proxy.alcf.anl.gov:3128"
+  http_proxy:  "http://proxy.alcf.anl.gov:3128"
+  https_proxy: "http://proxy.alcf.anl.gov:3128"
+
+nightly_wheels:
+  stage: nightly_build
+  extends: .aurora-batch-runner
+  # scheduler parameters
+  variables:
+    ANL_AURORA_SCHEDULER_PARAMETERS: "-A datascience -l select=1,walltime=06:00:00,filesystems=home:flare -q prod"
+  before_script:
+    # fail fast
+    - set -e
+    # load current frameworks module 
+    - module load frameworks || true
+    - conda deactivate || true
+  script:
+    # 1) Setup a fresh Python 3.12 env
+    - export ENV_NAME="nightly-$(date +%Y-%m-%d)"
+    - export BUILD_DIR="${BUILD_ROOT}/${ENV_NAME}"
+    - mkdir -p "${BUILD_DIR}" && cd "${BUILD_DIR}"
+    - conda create -y -q --prefix="${BUILD_DIR}" python=3.12
+    - conda activate "${BUILD_DIR}"
+
+    # 2) Build PyTorch
+    - git clone https://github.com/pytorch/pytorch
+    - cd pytorch
+    - git submodule sync && git submodule update --init --recursive
+    - pip install cmake ninja
+    - pip install -r requirements.txt mkl-static mkl-include
+    - export CC="$(which gcc)" CXX="$(which g++)"
+    - export REL_WITH_DEB_INFO=1
+    - export USE_CUDA=0
+    - export USE_ROCM=0
+    - export USE_MKLDNN=1
+    - export USE_MKL=1
+    - export USE_FBGEMM=1
+    - export USE_NNPACK=1
+    - export USE_NCCL=0
+    - export BUILD_CAFFE2_OPS=0
+    - export BUILD_TEST=0
+    - export USE_DISTRIBUTED=1
+    - export USE_NUMA=0
+    - export USE_MPI=1
+    - export USE_XPU=1
+    - export USE_XCCL=1
+    - export INTEL_MKL_DIR="$MKLROOT"
+    - export USE_AOT_DEVLIST='pvc'
+    - export TORCH_XPU_ARCH_LIST='pvc'
+    #- export OCLOC_VERSION=24.39.1 N.B. this doesn't match what is on the system. Let build system get correct version.
+    - export MAX_JOBS=48
+    - make triton
+    - python setup.py bdist_wheel --verbose 2>&1 | tee "torch-build-whl-$(date +%Y-%m-%d-%H%M%S).log"
+    - pip install dist/*.whl
+    - cd ../
+
+    # 3) Build Intel Extension for PyTorch
+    - git clone https://github.com/intel/intel-extension-for-pytorch
+    - cd intel-extension-for-pytorch
+    - git checkout xpu-main
+    - git submodule sync && git submodule update --init --recursive
+    - pip install -r requirements.txt
+    - INTELONEAPIROOT="$ONEAPI_ROOT" MAX_JOBS=48 \
+      CC="$(which gcc)" CXX="$(which g++)" \
+      python setup.py bdist_wheel 2>&1 | tee "ipex-build-whl-$(date +%Y-%m-%d-%H%M%S).log"
+    - pip install dist/*.whl
+    - cd ../
+
+    # 4) Build oneCCL bindings
+    - git clone https://github.com/intel/torch-ccl
+    - cd torch-ccl
+    #FIXME need to checkout c27ded5 or create a patch because the repo version.txt is messed up
+    - git checkout c27ded5
+    - git submodule sync && git submodule update --init --recursive
+    - pip install -r requirements.txt
+    - ONECCL_BINDINGS_FOR_PYTORCH_BACKEND=xpu \
+      INTELONEAPIROOT="$ONEAPI_ROOT" USE_SYSTEM_ONECCL=ON COMPUTE_BACKEND=dpcpp \
+      python setup.py bdist_wheel 2>&1 | tee "ccl-build-whl-$(date +%Y-%m-%d-%H%M%S).log"
+    - pip install dist/*.whl
+    - cd ../
+
+    # 5) Build mpi4py
+    - git clone https://github.com/mpi4py/mpi4py
+    - cd mpi4py
+    - CC=mpicc CXX=mpicxx python setup.py build |& tee build-mpi4py.log
+    - CC=mpicc CXX=mpicxx python setup.py install |& tee install-mpi4py.log
+    - cd ../
+
+    # 6) Verify
+    - |
+      python - <<'EOF'
+      import torch, intel_extension_for_pytorch as ipex, oneccl_bindings_for_pytorch as oneccl
+      print(torch.__file__)
+      print(torch.__config__.show())
+      print(f"torch: {torch.__version__}, XPU: {torch.xpu.is_available()} ({torch.xpu.device_count()})")
+      import torch.distributed
+      print(f"XCCL: {torch.distributed.is_xccl_available()}")
+      print(f"IPEX: {ipex.__version__}, oneCCL: {oneccl.__version__}")
+      EOF
+
+    # 7) Collect artifacts
+    - mkdir -p artifacts
+    - find . -type f \( -name "*.whl" -o -name "*.log" \) -exec cp --parents \{\} artifacts/ \; || true
+
+  artifacts:
+    name: "nightly-wheels-${ENV_NAME}"
+    when: always
+    expire_in: never
+    paths:
+      - artifacts/**/*
