@@ -106,7 +106,7 @@ nightly_wheels:
     - export USE_AOT_DEVLIST='pvc'
     - export TORCH_XPU_ARCH_LIST='pvc'
     #- export OCLOC_VERSION=24.39.1 N.B. this doesn't match what is on the system. Let build system get correct version.
-    - export MAX_JOBS=48
+    - export MAX_JOBS=24
     - make triton > "torch-build-triton-$(date +%Y-%m-%d-%H%M%S).log" 2>&1
     - python setup.py bdist_wheel --verbose > "torch-build-whl-$(date +%Y-%m-%d-%H%M%S).log" 2>&1
     - pip install dist/*.whl
@@ -119,7 +119,7 @@ nightly_wheels:
     - git submodule sync && git submodule update --init --recursive
     #- pip install -r requirements.txt
     - |
-      INTELONEAPIROOT="$ONEAPI_ROOT" MAX_JOBS=48 \
+      MAX_JOBS=16 INTELONEAPIROOT="$ONEAPI_ROOT" \
         CC="$(which gcc)" CXX="$(which g++)" \
         python setup.py bdist_wheel \
       > "ipex-build-whl-$(date +%Y-%m-%d-%H%M%S).log" 2>&1
