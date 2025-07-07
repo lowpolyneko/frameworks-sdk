@@ -33,7 +33,7 @@ nightly_wheels:
     #####################################################################
     - |
       # Fail fast, but propagate errors through functions and pipelines
-      set -Eeuo pipefail        # -E  -->  ERR propagates out of functions
+      set -Eeo pipefail        # -E  -->  ERR propagates out of functions
 
       # -----------------------------------------------------------------
       # Function to copy logs and wheels from compute node to Lustre ----
