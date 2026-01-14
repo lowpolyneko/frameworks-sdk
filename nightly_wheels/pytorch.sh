@@ -9,15 +9,11 @@ setup_build_env
 pushd 'pytorch'
 
 # Must use uv-managed python for development headers
-# TODO: allow specifying different python versions programatically
-uv venv --python 3.12
-
-# Need to install build utilities
-# TODO: most of these are included by requirements.txt?
-uv pip install --no-cache --link-mode=copy cmake ninja mkl-static mkl-include -r requirements.txt
+setup_uv_venv --group dev pip mkl-static mkl-include
 
 source .venv/bin/activate
 USE_XPU=1 make triton
+deactivate
 
 # 2) Set PyTorch build configuration
 export CC="$(which gcc)"
@@ -46,8 +42,7 @@ export OCLOC_VERSION=24.39.1
 export MAX_JOBS=48
 
 # 3) Build
-# build_bdist_wheel .
-python setup.py bdist_wheel --verbose
+build_bdist_wheel
 
 # 4) Archive Artifacts
 popd

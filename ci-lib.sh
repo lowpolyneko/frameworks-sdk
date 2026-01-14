@@ -31,6 +31,7 @@ setup_uv_venv() {
     # problems building with uv directly if the project has a poorly-written
     # pyproject.toml or expects build dependencies to be installed via pip
     # manually before or during compilation.
+    # TODO: allow specifying different python versions programatically
     uv venv --python 3.12
     uv pip install --no-cache --link-mode=copy "$@"
 }
