@@ -75,3 +75,20 @@ torch-ccl:
     expire_in: never
     paths:
       - "**/*.whl"
+
+mpi4py:
+  stage: build
+  extends: .sunspot-shell-runner
+  # scheduler parameters
+  variables:
+    ANL_AURORA_SCHEDULER_PARAMETERS: "-A datascience -l select=1,walltime=06:00:00,filesystems=home:flare -q prod"
+  script:
+    - cd frameworks-standalone/nightly_wheels
+    - ./mpi4py.sh
+
+  artifacts:
+    name: "nightly-wheels-${ENV_NAME}"
+    when: always
+    expire_in: never
+    paths:
+      - "**/*.whl"
