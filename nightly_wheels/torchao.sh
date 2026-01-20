@@ -1,0 +1,33 @@
+#!/bin/sh
+
+source ../ci-lib.sh
+
+# 0) Get pytorch wheel as argument
+while getopts 't:' opt; do
+    case "$opt" in
+        t)
+            TORCH_WHEEL="$(realpath $OPTARG)";;
+    esac
+done
+
+if [ -z "$TORCH_WHEEL" ]; then
+    echo "Usage: $0 -t <pytorch_wheel>" 1>&2
+    exit 1
+fi
+
+# 1) Pull source and gen build environment
+gen_build_dir_with_git 'https://github.com/pytorch/ao'
+setup_build_env
+
+setup_uv_venv "$TORCH_WHEEL"
+
+# 2) Set torch/ao build configuration
+export CC="$(which gcc)"
+export CXX="$(which g++)"
+export USE_CUDA=0
+export USE_XPU=1
+export USE_XCCL=1
+
+# 3) Build & Archive
+build_bdist_wheel
+archive_artifacts
