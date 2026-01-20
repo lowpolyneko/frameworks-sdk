@@ -1,9 +1,9 @@
 # Common library for frameworks-sdk build scripts
 
-set -x \        # command trace
-    -e \        # non-zero exit
-    -u \        # fail on unset env var
-    -o pipefail # pipe return as last
+set -x # command trace
+set -e # non-zero exit
+set -u # fail on unset env var
+set -o pipefail # pipe return last err
 
 # Loads the necessary environment for component builds.
 setup_build_env() {
