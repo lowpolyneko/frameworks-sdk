@@ -1,0 +1,19 @@
+#!/bin/sh
+
+source ../ci-lib.sh
+
+# 1) Pull source and gen build environment
+gen_build_dir_with_git 'https://github.com/h5py/h5py'
+setup_build_env
+
+module load hdf5
+
+# 2) Set h5py configuration
+export CC='mpicc'
+export CXX='mpicxx'
+export HDF5_MPI='ON'
+export HDF5_DIR="$HDF5_ROOT"
+
+# 3) Build & Archive
+uv build
+archive_artifacts
