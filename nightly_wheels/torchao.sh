@@ -16,16 +16,17 @@ if [ -z "$TORCH_WHEEL" ]; then
 fi
 
 # 1) Pull source and gen build environment
-gen_build_dir_with_git 'https://github.com/intel/intel-extension-for-pytorch' -b xpu-main
+gen_build_dir_with_git 'https://github.com/pytorch/ao'
 setup_build_env
 
-setup_uv_venv -r requirements.txt pip "$TORCH_WHEEL"
+setup_uv_venv "$TORCH_WHEEL"
 
-# 2) Set IPEX build configuration
+# 2) Set torch/ao build configuration
 export CC="$(which gcc)"
 export CXX="$(which g++)"
-export INTELONEAPIROOT="$ONEAPI_ROOT"
-export MAX_JOBS=16
+export USE_CUDA=0
+export USE_XPU=1
+export USE_XCCL=1
 
 # 3) Build & Archive
 build_bdist_wheel

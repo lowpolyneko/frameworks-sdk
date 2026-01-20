@@ -1,5 +1,10 @@
 # Common library for frameworks-sdk build scripts
 
+set -x \        # command trace
+    -e \        # non-zero exit
+    -u \        # fail on unset env var
+    -o pipefail # pipe return as last
+
 # Loads the necessary environment for component builds.
 setup_build_env() {
     module reset
@@ -7,6 +12,8 @@ setup_build_env() {
         (*"sunspot.alcf.anl.gov")
             module load cmake;; # `cmake` not in the system path on Sunspot
     esac
+
+    export DEFAULT_PYTHON_VERSION="${DEFAULT_PYTHON_VERSION:-3.12}"
 
     # module unload oneapi mpich
     # module use /soft/compilers/oneapi/2025.1.3/modulefiles
@@ -37,8 +44,7 @@ setup_uv_venv() {
     # problems building with uv directly if the project has a poorly-written
     # pyproject.toml or expects build dependencies to be installed via pip
     # manually before or during compilation.
-    # TODO: allow specifying different python versions programatically
-    uv venv --python 3.12
+    uv venv --python "$DEFAULT_PYTHON_VERSION"
     if [ "$#" -gt 0 ]; then
         uv pip install --no-cache --link-mode=copy "$@"
     fi
