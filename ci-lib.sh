@@ -46,6 +46,8 @@ setup_uv_venv() {
     # manually before or during compilation.
     uv venv --python "$DEFAULT_PYTHON_VERSION"
     if [ "$#" -gt 0 ]; then
+        # FIXME user home disk quota fills up w/ caching
+        # Lustre doesn't support hardlinks
         uv pip install --no-cache --link-mode=copy "$@"
     fi
 }
