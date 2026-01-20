@@ -44,15 +44,3 @@ export MAX_JOBS=48
 # 3) Build & Archive
 build_bdist_wheel
 archive_artifacts
-
-# 4) Verify
-# TODO separate build from tests/validation
-# python - <<'EOF'
-# import torch, intel_extension_for_pytorch as ipex, oneccl_bindings_for_pytorch as oneccl
-# print(torch.__file__)
-# print(torch.__config__.show())
-# print(f"torch: {torch.__version__}, XPU: {torch.xpu.is_available()} ({torch.xpu.device_count()})")
-# import torch.distributed
-# print(f"XCCL: {torch.distributed.is_xccl_available()}")
-# print(f"IPEX: {ipex.__version__}, oneCCL: {oneccl.__version__}")
-# EOF
