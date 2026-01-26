@@ -15,11 +15,6 @@ spec:
 $[[ inputs.wheel ]]:
   stage: build
   extends: .common-runner
-  variables:
-    # build in /tmp instead of on Lustre
-    BUILD_ROOT: "/tmp/frameworks-nightly/builds"
-    # where to collect logs and wheels on Lustre
-    REMOTE_ROOT: "/lus/flare/projects/datascience/ewong25/.frameworks-nightly"
   needs: $[[ inputs.needs ]]
   script:
     - cd nightly_wheels
