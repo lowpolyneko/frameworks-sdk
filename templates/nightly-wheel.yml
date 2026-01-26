@@ -1,10 +1,6 @@
 # Nightly wheel job template for in-repo scripts
 spec:
   inputs:
-    runner:
-      options: [aurora, sunspot]
-      default: aurora
-      description: CI runners to use
     wheel:
       description: Wheel to build
     flags:
@@ -18,14 +14,8 @@ spec:
 
 $[[ inputs.wheel ]]:
   stage: build
-  extends: .$[[ inputs.runner ]]-shell-runner
+  extends: .common-runner
   variables:
-    # scheduler parameters
-    ANL_AURORA_SCHEDULER_PARAMETERS: "-A datascience -l select=1,walltime=06:00:00,filesystems=home:flare -q prod"
-    HTTP_PROXY:  "http://proxy.alcf.anl.gov:3128"
-    HTTPS_PROXY: "http://proxy.alcf.anl.gov:3128"
-    http_proxy:  "http://proxy.alcf.anl.gov:3128"
-    https_proxy: "http://proxy.alcf.anl.gov:3128"
     # build in /tmp instead of on Lustre
     BUILD_ROOT: "/tmp/frameworks-nightly/builds"
     # where to collect logs and wheels on Lustre

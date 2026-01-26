@@ -1,0 +1,26 @@
+# Common definitions for all jobs
+spec:
+  inputs:
+    runner:
+      options: [aurora, sunspot]
+      default: aurora
+      description: CI runners to use
+---
+
+include:
+  - project: 'anl/ci-resources/defaults'
+    ref: main
+    file:
+      - '/runners.yml'
+
+.common-runner:
+  extends: .$[[ inputs.runner ]]-shell-runner
+  variables:
+    ANL_AURORA_SCHEDULER_PARAMETERS: '-A datascience -l select=1,walltime=06:00:00,filesystems=home:flare -q prod'
+    HTTP_PROXY:  'http://proxy.alcf.anl.gov:3128'
+    HTTPS_PROXY: 'http://proxy.alcf.anl.gov:3128'
+    http_proxy:  'http://proxy.alcf.anl.gov:3128'
+    https_proxy: 'http://proxy.alcf.anl.gov:3128'
+
+stages:
+  - build

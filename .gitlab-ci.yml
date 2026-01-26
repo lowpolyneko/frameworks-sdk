@@ -1,9 +1,6 @@
 # Build, package, and test the Frameworks SDK from {Aurora,Sunspot}
 include:
-  - project: 'anl/ci-resources/defaults'
-    ref: main
-    file:
-      - '/runners.yml'
+  - local: 'templates/common.yml'
 
   # Nightly Wheels
   - local: 'templates/nightly-wheel.yml'
@@ -22,6 +19,3 @@ include:
   - local: 'templates/nightly-wheel.yml'
     inputs:
       wheel: mpi4py
-
-stages:
-  - build
