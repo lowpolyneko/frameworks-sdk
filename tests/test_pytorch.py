@@ -18,3 +18,8 @@ def sanity_check():
         print(
             f"torch.xpu.get_device_properties({i}): {torch.xpu.get_device_properties(i)}"
         )
+
+
+def torch_testsuite():
+    ret = pytest.main(["--pyargs", "torch.tests"])
+    assert ret == 0
