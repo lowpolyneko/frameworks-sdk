@@ -24,3 +24,4 @@ $[[ inputs.wheel ]]:
     expire_in: never
     paths:
       - "**/$[[ inputs.wheel ]]*.whl"
+      - "**/*.log"

@@ -55,7 +55,7 @@ setup_uv_venv() {
 build_bdist_wheel() {
     # We directly invoke `setup.py` so we can use our custom venvs.
     source .venv/bin/activate
-    python setup.py bdist_wheel
+    python setup.py bdist_wheel |& tee build_bdist_wheel.log
     deactivate
 }
 
@@ -64,7 +64,7 @@ cleanup_build_dir() {
     TMP_DIR="$PWD"
     popd
 
-    find "$TMP_DIR" -type f -name "*.whl" -print0 | xargs -0 cp --target-directory="$PWD"
+    find "$TMP_DIR" -type f \( -name "*.whl" -o -name "build_bdist_wheel.log" \) -print0 | xargs -0 cp -t "$PWD"
     rm -rf "$TMP_DIR"
 }
 
