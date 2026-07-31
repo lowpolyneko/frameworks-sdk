@@ -52,6 +52,136 @@ index b027d63f1a7..cbe3e9fc1af 100644
 2.50.1 (Apple Git-155)
 EOF
 
+# Patch SYCL version guard drop
+git am <<'EOL'
+From d875d65b53c6d879d3c979078f989b195c705f6a Mon Sep 17 00:00:00 2001
+From: Ethan Wong <ewong@anl.gov>
+Date: Fri, 31 Jul 2026 10:37:57 -0500
+Subject: [PATCH] Revert "Drop sycl compiler guard less than 2026 for XPU
+ (#191470)"
+
+This reverts commit 15d589c8f6dc7278dee87552ac1ce0ee15d8232d.
+---
+ c10/xpu/XPUDeviceProp.h   |  2 ++
+ c10/xpu/XPUFunctions.cpp  |  7 +++++++
+ cmake/public/xpu.cmake    | 10 +++++++++-
+ test/test_xpu.py          |  9 +++++----
+ torch/csrc/xpu/Module.cpp |  7 ++++++-
+ 5 files changed, 29 insertions(+), 6 deletions(-)
+
+diff --git a/c10/xpu/XPUDeviceProp.h b/c10/xpu/XPUDeviceProp.h
+index 32e76ee3c89..7648fc8444a 100644
+--- a/c10/xpu/XPUDeviceProp.h
++++ b/c10/xpu/XPUDeviceProp.h
+@@ -223,8 +223,10 @@ struct C10_XPU_API DeviceProp{
+     // ext properties.
+     AT_FORALL_XPU_EXT_DEVICE_PROPERTIES(DEFINE_EXT_DEVICE_PROP)
+ 
++#if SYCL_COMPILER_VERSION >= 20260000
+     // device aspects.
+     DEFINE_DEVICE_ASPECT(is_integrated_gpu)
++#endif
+ 
+     // device has aspects.
+     AT_FORALL_XPU_DEVICE_ASPECT(DEFINE_DEVICE_HAS_ASPECT)
+diff --git a/c10/xpu/XPUFunctions.cpp b/c10/xpu/XPUFunctions.cpp
+index b52a576aacd..48610019041 100644
+--- a/c10/xpu/XPUFunctions.cpp
++++ b/c10/xpu/XPUFunctions.cpp
+@@ -43,7 +43,12 @@ void enumDevices(std::vector<std::unique_ptr<sycl::device>>& devices) {
+   // See Note [Device Management] for more details.
+   auto platform_list = sycl::platform::get_platforms();
+   auto is_igpu = [](const sycl::device& device) {
++#if SYCL_COMPILER_VERSION < 20260000
++    // Generally, iGPUs share a unified memory subsystem with the host.
++    return device.get_info<sycl::info::device::host_unified_memory>();
++#else
+     return device.has(sycl::aspect::ext_oneapi_is_integrated_gpu);
++#endif
+   };
+ 
+   // Check if a platform contains at least one GPU (either iGPU or dGPU).
+@@ -184,7 +189,9 @@ void initDeviceProperties(DeviceProp* device_prop, DeviceIndex device) {
+ 
+   AT_FORALL_XPU_EXT_DEVICE_PROPERTIES(ASSIGN_EXT_DEVICE_PROP);
+ 
++#if SYCL_COMPILER_VERSION >= 20260000
+   ASSIGN_DEVICE_ASPECT(is_integrated_gpu)
++#endif
+ 
+   AT_FORALL_XPU_DEVICE_ASPECT(ASSIGN_DEVICE_HAS_ASPECT);
+ 
+diff --git a/cmake/public/xpu.cmake b/cmake/public/xpu.cmake
+index dfa9183596f..25eb968fe93 100644
+--- a/cmake/public/xpu.cmake
++++ b/cmake/public/xpu.cmake
+@@ -72,7 +72,15 @@ string(APPEND XPU_HOST_CXX_FLAGS " -DUSE_XPU")
+ string(APPEND XPU_HOST_CXX_FLAGS " -DSYCL_COMPILER_VERSION=${SYCL_COMPILER_VERSION}")
+ 
+ if(DEFINED ENV{XPU_ENABLE_KINETO})
+-  set(XPU_ENABLE_KINETO $ENV{XPU_ENABLE_KINETO})
++  set(XPU_ENABLE_KINETO TRUE)
++else()
++  set(XPU_ENABLE_KINETO FALSE)
++endif()
++
++if(WIN32)
++  if(${SYCL_COMPILER_VERSION} GREATER_EQUAL 20250101)
++    set(XPU_ENABLE_KINETO TRUE)
++  endif()
+ else()
+   set(XPU_ENABLE_KINETO TRUE)
+ endif()
+diff --git a/test/test_xpu.py b/test/test_xpu.py
+index 75f24be2044..0ac59dcd3dd 100644
+--- a/test/test_xpu.py
++++ b/test/test_xpu.py
+@@ -179,10 +179,11 @@ class TestXpu(TestCase):
+             len(str(device_properties.uuid)), 36
+         )  # xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+         self.assertEqual(len(device_properties.uuid.bytes), 16)
+-        self.assertEqual(
+-            device_properties.is_integrated_gpu,
+-            device_capability["is_integrated_gpu"],
+-        )
++        if int(torch.version.xpu) >= 20260000:
++            self.assertEqual(
++                device_properties.is_integrated_gpu,
++                device_capability["is_integrated_gpu"],
++            )
+ 
+     def test_get_device_capability(self):
+         device_capability = torch.xpu.get_device_capability()
+diff --git a/torch/csrc/xpu/Module.cpp b/torch/csrc/xpu/Module.cpp
+index 34446e34a8c..c0309e49224 100644
+--- a/torch/csrc/xpu/Module.cpp
++++ b/torch/csrc/xpu/Module.cpp
+@@ -348,7 +348,9 @@ static void registerXpuDeviceProperties(PyObject* module) {
+       ._(has_subgroup_2d_block_io)
+ 
+   THXP_FORALL_DEVICE_PROPERTIES(DEFINE_READONLY_MEMBER)
++#if SYCL_COMPILER_VERSION >= 20260000
+       .def_readonly("is_integrated_gpu", &DeviceProp::is_integrated_gpu)
++#endif
+       .def_readonly("total_memory", &DeviceProp::global_mem_size)
+       // TODO: Expose cache size by level when available from SYCL
+       .def_readonly("last_level_cache_size", &DeviceProp::global_mem_cache_size)
+@@ -385,7 +387,10 @@ static void registerXpuDeviceProperties(PyObject* module) {
+                    << "], has_fp16=" << prop.has_fp16
+                    << ", has_fp64=" << prop.has_fp64
+                    << ", has_atomic64=" << prop.has_atomic64
+-                   << ", is_integrated_gpu=" << prop.is_integrated_gpu << ")";
++#if SYCL_COMPILER_VERSION >= 20260000
++                   << ", is_integrated_gpu=" << prop.is_integrated_gpu
++#endif
++                   << ')';
+             return std::move(stream).str();
+           });
+ }
+-- 
+2.50.1 (Apple Git-155)
+EOL
+
 # Patch torch-xpu-ops to support oneAPI
 TORCH_XPU_OPS_COMMIT="$(cat third_party/xpu.txt)"
 git clone 'https://github.com/intel/torch-xpu-ops.git' third_party/torch-xpu-ops
